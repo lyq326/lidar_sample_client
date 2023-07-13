@@ -8,6 +8,7 @@
 #include "data/DataFrame.h"
 #include "framepanel/ByteButton.h"
 #include "framepanel/FramePanel.h"
+#include "configpanel/ConfigPanel.h"
 // #include <qDebug>
 #include <QtMqtt>
 
@@ -35,6 +36,7 @@ private:
     DataFrame stucData;
     FramePanel* dockFramePanel;
     QDockWidget* dockRawPanel;
+    ConfigPanel* dockConfigPanel;
 
     QMqttClient* m_client;
     QTimer* m_mqttTimer;

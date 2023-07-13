@@ -7,15 +7,6 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // QFont f = font();
-    // f.setFamily("Segoe UI");
-    // setFont(f);
-
-    // QFile qss("../StyleSheet.qss");
-    // qss.open(QFile::ReadOnly);
-    // this->setStyleSheet(qss.readAll());
-    // qss.close();
-
     QWidget* p = takeCentralWidget();
     if(p)
         delete p;
@@ -26,17 +17,15 @@ MainWindow::MainWindow(QWidget *parent)
 
     dockWidgetContents->setObjectName(QString::fromUtf8("dockWidgetContents1"));
 
-
-    
-    // QGridLayout* layout = new QGridLayout(dockWidgetContents);
     FlowLayout* layoutRaw = new FlowLayout(dockWidgetContents);
 
     dockRawPanel->setWidget(dockWidgetContents);
 
+    dockConfigPanel = new ConfigPanel("Config", this);
 
     const auto infos = QSerialPortInfo::availablePorts();
     for (const QSerialPortInfo &info : infos)
-        this->ui->comboComPort->addItem(info.portName());
+        this->dockConfigPanel->comboComPort->addItem(info.portName());
 
     
 
@@ -44,23 +33,23 @@ MainWindow::MainWindow(QWidget *parent)
 
     
     for(size_t i = 0; i<40;i++){
-        // ByteButton *btn = new ByteButton(QString("%1").arg(QString::number(i),2,QChar('0')));
         ByteButton *btn = new ByteButton(dockRawPanel);
         btnDataPanel.append(btn);
-        // btn->setParent(dockRawPanel);
+
         layoutRaw->addWidget(btn);
-        // layout->addWidget(btn, i/4, i%4);
 
 
         connect(btn, &ByteButton::actTriggered, this, 
             [i, this](const ByteButton* index, const QMetaType::Type t){
                 this->stucData.addDataSection(QMetaType::typeName(t)+QString::number(i), t, i);
         });
-        // btn->show();
     }
     m_client = new QMqttClient(this);
+    this->addDockWidget(static_cast<Qt::DockWidgetArea>(1), dockConfigPanel);
     this->addDockWidget(Qt::LeftDockWidgetArea, dockRawPanel);
     this->addDockWidget(Qt::RightDockWidgetArea, dockFramePanel);
+
+    this->dockConfigPanel->setAllowedAreas(Qt::AllDockWidgetAreas);
     this->dockRawPanel->setAllowedAreas(Qt::AllDockWidgetAreas);
     this->dockFramePanel->setAllowedAreas(Qt::AllDockWidgetAreas);
 
@@ -72,37 +61,35 @@ MainWindow::MainWindow(QWidget *parent)
     stucData.addDataSection("Cn2", QMetaType::Float, 32);
     stucData.addDataSection("Cnt", QMetaType::UShort, 2);
 
-    ui->sboxFrameLength->setValue(40);
-    ui->leMqttIp->setText("188.131.134.188");
-    ui->rbtnAutoParse->setChecked(true);
+    this->dockConfigPanel->sboxFrameLength->setValue(40);
+    this->dockConfigPanel->leMqttIp->setText("188.131.134.188");
+    this->dockConfigPanel->rbtnAutoParse->setChecked(true);
 
-    ui->btnComConnect->setIcon(QIcon("../res/icon/AddConnection.svg"));
-
-    connect(ui->btnComConnect, &QPushButton::clicked, this,
+    this->dockConfigPanel->btnComConnect->setIcon(QIcon("/home/kylin/lib/vs2022_img_lib/images/Link.svg"));
+    this->dockConfigPanel->btnComConnect->setIconSize(QSize(20, 20));
+    // this->dockConfigPanel->btnComConnect->setIcon(QIcon("../res/icon/AddConnection.svg"));
+    connect(this->dockConfigPanel->btnComConnect, &QPushButton::clicked, this,
         [this](){
-            QString portName = this->ui->comboComPort->currentText();
-            if(ui->btnComConnect->isChecked()){
-                this->threadSerial->startReceiver(portName, 15, this->ui->sboxFrameLength->value(), "");
-                ui->btnComConnect->setIcon(QIcon("../res/icon/Disconnect.svg"));
+            QString portName = this->dockConfigPanel->comboComPort->currentText();
+            if(this->dockConfigPanel->btnComConnect->isChecked()){
+                this->threadSerial->startReceiver(portName, 15, this->dockConfigPanel->sboxFrameLength->value(), "");
+                this->dockConfigPanel->btnComConnect->setIcon(QIcon("/home/kylin/lib/vs2022_img_lib/images/Unlink.svg"));
             }
             else{
                 this->threadSerial->stopReceiver();
-                ui->btnComConnect->setIcon(QIcon("../res/icon/AddConnection.svg"));
+                this->dockConfigPanel->btnComConnect->setIcon(QIcon("/home/kylin/lib/vs2022_img_lib/images/Link.svg"));
             }
 
-            if(ui->rbtnAutoParse->isChecked()){
+            if(this->dockConfigPanel->rbtnAutoParse->isChecked()){
                 connect(&stucData, &DataFrame::newSectionsVaild, dockFramePanel, &FramePanel::updateSectionsList);
             }
         }    
     );
-    // threadSerial->startReceiver("COM10", 15, 40, "");
 
-    stucData.fromFrameRaw(QByteArray::fromRawData("\xAA\x55\x3F\x2D\xCA\x80\x27\x00\x4C\x73\x25\x00\x73\x19\x25\x00\x07\x01\x49\x00\x00\x00\x00\x00\x00\x00\x63\x04\xCF\x8A\x01\x00\xAB\x77\xFA\x26\x28\x00\xE4\x08", 40));
+    // stucData.fromFrameRaw(QByteArray::fromRawData("\xAA\x55\x3F\x2D\xCA\x80\x27\x00\x4C\x73\x25\x00\x73\x19\x25\x00\x07\x01\x49\x00\x00\x00\x00\x00\x00\x00\x63\x04\xCF\x8A\x01\x00\xAB\x77\xFA\x26\x28\x00\xE4\x08", 40));
     
-    // stucData.toJsonObj();
-    // 将json对象里的数据转换为字符串
     QJsonDocument doc;
-    // 将object设置为本文档的主要对象
+
     doc.setObject(stucData.toJsonObj());
     QString str64 = doc.toJson(QJsonDocument::Compact).toBase64();
 
@@ -113,11 +100,6 @@ MainWindow::MainWindow(QWidget *parent)
     m_client->setPort(1883);
 
     m_client->connectToHost();
-    // connect(m_client,&QMqttClient::connected,this,[this](){
-    //     if(m_client->state() == QMqttClient::Connected){
-    //         m_client->subscribe(QMqttTopicFilter("hmtm2/+"));
-    //     }
-    // });
 
     connect(m_client,&QMqttClient::disconnected,this,[this](){
         qDebug()<<"QMqttClient::disconnected";
@@ -137,26 +119,17 @@ MainWindow::MainWindow(QWidget *parent)
         }
         qDebug()<<"QTimer::timeout";
     });
-    
-    // connect(m_client,&QMqttClient::disconnected,this,[this](){
-    //     qDebug()<<"QMqttClient::disconnected";
-    // });
 
-    // dockFramePanel->updateSectionsList(this->stucData.dataSections());
     connect(threadSerial, &ReceiverThread::request, this, &MainWindow::updateDataPanel);
     connect(threadSerial, &ReceiverThread::request, &stucData, &DataFrame::fromFrameRaw);
     connect(&stucData, &DataFrame::newSectionsVaild,  dockFramePanel, &FramePanel::updateSectionsList);
     connect(&stucData, &DataFrame::newSectionsVaild, this, [this](){
         QJsonDocument doc;
-        // 将object设置为本文档的主要对象
         doc.setObject(stucData.toJsonObj());
         QByteArray bytes64 = doc.toJson(QJsonDocument::Compact).toBase64();
         if(m_client->state() == QMqttClient::Connected){
-            // if(!((stucData.dataSections().value(0x0202)._data._d)%20)){
                 m_client->publish(QMqttTopicName("hmtm2/0021/protocol"), bytes64, 2);
                 m_client->publish(QMqttTopicName("hmtm2/0021/raw"), stucData.toFrameRaw(), 2);
-            // }
-
         }
     });
 
@@ -164,11 +137,8 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    // delete btnDataPanel;
     delete dockFramePanel;
-    // threadSerial->m_quit = true;
 
-    // threadSerial->terminate();
     threadSerial->stopReceiver();
     delete threadSerial;
     
@@ -210,7 +180,7 @@ void MainWindow::updateDataPanel(const QByteArray &s)
                 qss = QString("background-color: rgb(0, 255, 255);");
                 break;
         }
-        // auto& val = _dataSections[k];
+
         for(auto b: QVector(btnDataPanel.mid(k._offset, k._length))){
             b->setStyleSheet(qss);
         }
@@ -229,11 +199,4 @@ void MainWindow::updateDataStore(const QByteArray &s)
     {
         strDataStore.remove(0, 1000);
     }
-    // qDebug()<<s;
-    // qDebug()<<*str;
-    // qDebug()<<(*str).length();
-    // for(auto btn = btnDataPanel.begin(); btn != btnDataPanel.end(); btn++){
-    //     size_t i = std::distance(btnDataPanel.begin(), btn);
-    //     (*btn)->setText(str->mid(2*i,2));
-    // }
 }

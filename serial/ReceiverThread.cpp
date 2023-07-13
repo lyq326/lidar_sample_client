@@ -81,7 +81,12 @@ void ReceiverThread::run()
                 requestData = serial.read(m_frameLen);
                 // if((requestData[0] = 0xaa)&&(requestData[0] = 0xaa))
                 if(requestData.length() == m_frameLen)
-                    emit this->request(requestData);
+                    if((requestData[0] = 0xaa)&&(requestData[1] = 0x55)){
+                        emit this->request(requestData);
+                    }
+                    else{
+                        serial.clear();
+                    }
                 else{
                     serial.read(m_frameLen - requestData.length());
                 }

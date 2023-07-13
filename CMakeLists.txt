@@ -36,6 +36,8 @@ set(PROJECT_SOURCES
         framepanel/ByteButton.h
         framepanel/FramePanel.cpp
         framepanel/FramePanel.h
+        configpanel/ConfigPanel.cpp
+        configpanel/ConfigPanel.h
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
