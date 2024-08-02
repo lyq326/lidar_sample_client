@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainInfoForm</class>
+ <widget class="QWidget" name="MainInfoForm">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>800</width>
+    <height>600</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QTabWidget" name="tabWidget">
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <widget class="QWidget" name="tabScan">
+      <attribute name="title">
+       <string>扫描</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <widget class="QTreeWidget" name="treeWidget">
+         <column>
+          <property name="text">
+           <string>Lidar</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>地址</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>连接</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>状态</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>采集</string>
+          </property>
+         </column>
+         <item>
+          <property name="text">
+           <string>Test</string>
+          </property>
+          <property name="text">
+           <string>192.168.0.10</string>
+          </property>
+          <property name="text">
+           <string>√</string>
+          </property>
+          <property name="text">
+           <string>√</string>
+          </property>
+          <property name="text">
+           <string>×</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tabFav">
+      <attribute name="title">
+       <string>收藏</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_3">
+       <item>
+        <widget class="QTreeWidget" name="treeWidget_2">
+         <column>
+          <property name="text">
+           <string>Lidar</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>地址</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>连接</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>状态</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>采集</string>
+          </property>
+         </column>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

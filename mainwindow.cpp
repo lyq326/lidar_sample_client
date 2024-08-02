@@ -1,202 +1,176 @@
 #include "mainwindow.h"
-#include "./ui_mainwindow.h"
+#include "ui_mainwindow.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    MainInfoForm* infoLidar = new MainInfoForm(this);
+    DataSubWidget* dataSub = new DataSubWidget();
+    // NetClient* nc = new NetClient(this);
+    m_sample = new Sample(this);
+    m_database = new Database(this);
 
-    QWidget* p = takeCentralWidget();
-    if(p)
-        delete p;
-    threadSerial = new ReceiverThread(this);
-    dockFramePanel = new FramePanel("Frame", this);
-    dockRawPanel = new QDockWidget("Raw", this);
-    QWidget* dockWidgetContents = new QWidget(dockRawPanel);
-
-    dockWidgetContents->setObjectName(QString::fromUtf8("dockWidgetContents1"));
-
-    FlowLayout* layoutRaw = new FlowLayout(dockWidgetContents);
-
-    dockRawPanel->setWidget(dockWidgetContents);
-
-    dockConfigPanel = new ConfigPanel("Config", this);
-
-    const auto infos = QSerialPortInfo::availablePorts();
-    for (const QSerialPortInfo &info : infos)
-        this->dockConfigPanel->comboComPort->addItem(info.portName());
-
+    ui->verticalLayout_Central->addWidget(infoLidar);
     
 
-    
+    qint32 laser_freq = 1000;
+    qint32 bytes_per_data = infoLidar->infoWidget->m_sample_mode?4:5;
 
-    
-    for(size_t i = 0; i<40;i++){
-        ByteButton *btn = new ByteButton(dockRawPanel);
-        btnDataPanel.append(btn);
+    connect(infoLidar->infoWidget, &InstanceInfoForm::sampleStop, this, [this](){
+        m_sample->sampleStop();
+    });
 
-        layoutRaw->addWidget(btn);
+    connect(infoLidar->infoWidget, &InstanceInfoForm::sampleStart, this, [this, infoLidar, laser_freq, &bytes_per_data](){
+
+        // bytes_per_data = infoLidar->infoWidget->m_sample_mode?4:5;
+
+        // qint32 psc = (infoLidar->infoWidget->Resolution())/(infoLidar->infoWidget->m_sample_mode?750:1500);
+        // qint32 tnum = infoLidar->infoWidget->SampleLength();
+        qint32 atime = infoLidar->infoWidget->AccumulateLength()*laser_freq;
+
+        m_sample->initSample(infoLidar->infoWidget->m_sample_mode);
+
+        m_sample->sampleStart(infoLidar->infoWidget->Resolution(), 
+            infoLidar->infoWidget->SampleLength(),
+            infoLidar->infoWidget->AccumulateLength(),
+            infoLidar->infoWidget->isSampleContinuous
+        );
+
+        infoLidar->infoWidget->pbSampleCnt->setMaximum(atime);
+    });
+
+    // qint32 if_chn_finish = 0;
+
+    connect(m_sample->m_nc, &NetClient::progressUpdate, [=](qint32 cnt, quint32 chn){
+        // qDebug()<<"chn"<<chn<<"cnt"<<cnt<<"in"<<infoLidar->infoWidget->Chn();
+        quint32 chn_real = chn%4;
+        if(infoLidar->infoWidget->Chn()&(0x01<<chn_real)){
+            infoLidar->infoWidget->pbSampleCnt->setValue(cnt);
+            infoLidar->infoWidget->lnSampleCnt->display(cnt);
+        }
+
+    });
+
+    connect(m_sample, &Sample::sampleFinished, [=](){
+        infoLidar->infoWidget->setSampleUI(false);
+    });
 
 
-        connect(btn, &ByteButton::actTriggered, this, 
-            [i, this](const ByteButton* index, const QMetaType::Type t){
-                this->stucData.addDataSection(QMetaType::typeName(t)+QString::number(i), t, i);
-        });
+    connect(m_sample, &Sample::newDataValid, [=](QDateTime time, QMap<QString, QVector<float>> map){
+        // qDebug()<<data.size();
+        QString str_time = time.toString("hh:mm:ss");
+        infoLidar->infoWidget->lLastFrameTime->setText(str_time);
+
+    });
+
+    connect(infoLidar->infoWidget->btnImport, &QPushButton::clicked, [this](){
+        QStringList files = QFileDialog::getOpenFileNames(this, QString("导入"), "../", QString("File(*.csv*)"));
+        qDebug() << "file " << files;
+        if(files.length()<=0){
+            return;
+        }
+        QFile f(files.at(0));
+
+        for(auto f:files){
+            QFile file(f);
+            importRecManual(file);
+        }
+
+        // bool retFlag = 
+        
+        // m_listJsonLine = txtToJson(f);
+    });
+
+    connect(m_sample, &Sample::newDataValid, [this, infoLidar, dataSub](QDateTime time, QMap<QString, QVector<float>> map){
+        int groupSize = infoLidar->infoWidget->m_sample_mode?4:5;
+        QVariantMap vm{};
+
+        for(auto k:LidarData::keysRawInt){
+            if(map.contains(k)){
+                QVector<qint32> data_int = QVector<qint32>(map[k].begin(), map[k].end());
+                QFile file("../data/"+k+"_"+time.toString("_yyyyMMdd_HHmmss")+".csv");
+                if(file.open(QIODevice::WriteOnly|QIODevice::Text)){
+                    QTextStream out(&file);
+                    for(int i=0;i<data_int.size();i++){
+
+                        out<<QString::number(data_int[i])<<", "<<Qt::endl;
+                    }
+                }
+                file.close();
+                // dataSub->addData(data_int, LidarData::keysRawInt.indexOf(k));
+
+                QByteArray z_data = qCompress(QByteArray::fromRawData(
+                    reinterpret_cast<const char*>(map[k].constData()),
+                    sizeof(float) * map[k].size()
+                ));
+
+                // qDebug()<<k<<map[k].size()<<QByteArray::fromRawData(
+                //     reinterpret_cast<const char*>(map[k].constData()),
+                //     sizeof(float) * map[k].size()
+                // ).length()<<z_data.length();
+                vm.insert(k, z_data);
+
+                m_database->storeToDB(LidarData::types[1], time.toMSecsSinceEpoch(), vm);
+            }
+        }
+    });
+
+
+    connect(infoLidar->infoWidget->btnDataSub, &QPushButton::clicked, this, [=](){
+        dataSub->show();
+        dataSub->activateWindow();
+    });
+}
+
+bool MainWindow::importRecManual(QFile &f)
+{
+    QDateTime t = QDateTime::fromString(QFileInfo(f).baseName().right(15), "yyyyMMdd_HHmmss");
+    if (!t.isValid())
+    {
+        qDebug() << "日期解析失败";
+        QMessageBox::information(NULL, "错误", "日期解析失败！", QMessageBox::Ok);
+        t = QDateTime::currentDateTime();
     }
-    m_client = new QMqttClient(this);
-    this->addDockWidget(static_cast<Qt::DockWidgetArea>(1), dockConfigPanel);
-    this->addDockWidget(Qt::LeftDockWidgetArea, dockRawPanel);
-    this->addDockWidget(Qt::RightDockWidgetArea, dockFramePanel);
 
-    this->dockConfigPanel->setAllowedAreas(Qt::AllDockWidgetAreas);
-    this->dockRawPanel->setAllowedAreas(Qt::AllDockWidgetAreas);
-    this->dockFramePanel->setAllowedAreas(Qt::AllDockWidgetAreas);
+    qint32 chn_real = QFileInfo(f).baseName().mid(2, 1).toInt();
+    chn_real %= 4;
+    QString key = QFileInfo(f).baseName().left(QFileInfo(f).baseName().length() - 17);
 
-    // updateDataPanel(QByteArray::fromRawData("\xAA\x55\x3F\x2D\xCA\x80\x27\x00\x4C\x73\x25\x00\x73\x19\x25\x00\x07\x01\x49\x00\x00\x00\x00\x00\x00\x00\x63\x04\xCF\x8A\x01\x00\xAB\x77\xFA\x26\x28\x00\xE4\x08", 40));
-    stucData.addDataSection("Diff", QMetaType::UInt, 16);
-    stucData.addDataSection("Ref", QMetaType::UInt, 4);
-    stucData.addDataSection("Temp", QMetaType::Short, 26);
-    stucData.addDataSection("Pres", QMetaType::UInt, 28);
-    stucData.addDataSection("Cn2", QMetaType::Float, 32);
-    stucData.addDataSection("Cnt", QMetaType::UShort, 2);
+    qDebug() << f.fileName() << t;
 
-    this->dockConfigPanel->sboxFrameLength->setValue(40);
-    this->dockConfigPanel->leMqttIp->setText("188.131.134.188");
-    this->dockConfigPanel->rbtnAutoParse->setChecked(true);
+    QVector<float> data_float;
+    if (f.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
 
-    this->dockConfigPanel->btnComConnect->setIcon(QIcon("/home/kylin/lib/vs2022_img_lib/images/Link.svg"));
-    this->dockConfigPanel->btnComConnect->setIconSize(QSize(20, 20));
-    // this->dockConfigPanel->btnComConnect->setIcon(QIcon("../res/icon/AddConnection.svg"));
-    connect(this->dockConfigPanel->btnComConnect, &QPushButton::clicked, this,
-        [this](){
-            QString portName = this->dockConfigPanel->comboComPort->currentText();
-            if(this->dockConfigPanel->btnComConnect->isChecked()){
-                this->threadSerial->startReceiver(portName, 15, this->dockConfigPanel->sboxFrameLength->value(), "");
-                this->dockConfigPanel->btnComConnect->setIcon(QIcon("/home/kylin/lib/vs2022_img_lib/images/Unlink.svg"));
-            }
-            else{
-                this->threadSerial->stopReceiver();
-                this->dockConfigPanel->btnComConnect->setIcon(QIcon("/home/kylin/lib/vs2022_img_lib/images/Link.svg"));
-            }
-
-            if(this->dockConfigPanel->rbtnAutoParse->isChecked()){
-                connect(&stucData, &DataFrame::newSectionsVaild, dockFramePanel, &FramePanel::updateSectionsList);
-            }
-        }    
-    );
-
-    // stucData.fromFrameRaw(QByteArray::fromRawData("\xAA\x55\x3F\x2D\xCA\x80\x27\x00\x4C\x73\x25\x00\x73\x19\x25\x00\x07\x01\x49\x00\x00\x00\x00\x00\x00\x00\x63\x04\xCF\x8A\x01\x00\xAB\x77\xFA\x26\x28\x00\xE4\x08", 40));
-    
-    QJsonDocument doc;
-
-    doc.setObject(stucData.toJsonObj());
-    QString str64 = doc.toJson(QJsonDocument::Compact).toBase64();
-
-    // qDebug()<<str64.length()<<str64;
-    m_client = new QMqttClient(this);
-    m_mqttTimer = new QTimer(this);
-    m_client->setHostname("188.131.134.188");
-    m_client->setPort(1883);
-
-    m_client->connectToHost();
-
-    connect(m_client,&QMqttClient::disconnected,this,[this](){
-        qDebug()<<"QMqttClient::disconnected";
-        if(!(m_mqttTimer->isActive())){
-            m_mqttTimer->start(5000);
+        while (!f.atEnd())
+        {
+            QByteArray line = f.readLine();
+            QString str(line);
+            str.remove(',');
+            str.remove('\n');
+            data_float.append(str.toFloat());
         }
-    });
-    connect(m_client,&QMqttClient::connected,this,[this](){
-        qDebug()<<"QMqttClient::connected";
-    });
-    connect(m_mqttTimer,&QTimer::timeout,this,[this](){
-        if(m_client->state() == QMqttClient::Disconnected){
-            m_client->connectToHost();
-        }
-        else{
-            m_mqttTimer->stop();
-        }
-        qDebug()<<"QTimer::timeout";
-    });
+        f.close();
+        qDebug()<<data_float.length();
+    }
+    else
+    {
+        qDebug() << f.fileName() << f.errorString();
+        return false;
+    }
+    if (!LidarData::keysRawInt.contains(key))
+    {
+        key = LidarData::keysRawInt.at(chn_real);
+    }
 
-    connect(threadSerial, &ReceiverThread::request, this, &MainWindow::updateDataPanel);
-    connect(threadSerial, &ReceiverThread::request, &stucData, &DataFrame::fromFrameRaw);
-    connect(&stucData, &DataFrame::newSectionsVaild,  dockFramePanel, &FramePanel::updateSectionsList);
-    connect(&stucData, &DataFrame::newSectionsVaild, this, [this](){
-        QJsonDocument doc;
-        doc.setObject(stucData.toJsonObj());
-        QByteArray bytes64 = doc.toJson(QJsonDocument::Compact).toBase64();
-        if(m_client->state() == QMqttClient::Connected){
-                m_client->publish(QMqttTopicName("hmtm2/0021/protocol"), bytes64, 2);
-                m_client->publish(QMqttTopicName("hmtm2/0021/raw"), stucData.toFrameRaw(), 2);
-        }
-    });
-
+    emit m_sample->newDataValid(t, QMap<QString, QVector<float>>{{key, data_float}});
+    return true;
 }
 
 MainWindow::~MainWindow()
 {
-    delete dockFramePanel;
-
-    threadSerial->stopReceiver();
-    delete threadSerial;
     
     delete ui;
-}
-
-void MainWindow::updateDataPanel(const QByteArray &s)
-{
-    QString *str = new QString(s.toHex());
-    // qDebug()<<s;
-    // qDebug()<<*str;
-    // qDebug()<<(*str).length();
-    for(auto btn = btnDataPanel.begin(); btn != btnDataPanel.end(); btn++){
-        size_t i = std::distance(btnDataPanel.begin(), btn);
-        (*btn)->setText(str->mid(2*i,2));
-    }
-
-    for(auto k : stucData.dataSections())
-    {
-        QString qss;
-        switch (k._type)
-        {
-            case QMetaType::QChar:
-            case QMetaType::QString:
-            case QMetaType::QByteArray:
-                qss = QString("background-color: rgb(255, 0, 0);");
-                break;
-            case QMetaType::SChar:
-            case QMetaType::UChar:
-            case QMetaType::Short:
-            case QMetaType::UShort:
-                qss = QString("background-color: rgb(255, 255, 0);");
-                break;
-            case QMetaType::Int:
-            case QMetaType::UInt:
-                qss = QString("background-color: rgb(0, 255, 0);");
-                break;
-            case QMetaType::Float:
-                qss = QString("background-color: rgb(0, 255, 255);");
-                break;
-        }
-
-        for(auto b: QVector(btnDataPanel.mid(k._offset, k._length))){
-            b->setStyleSheet(qss);
-        }
-        // qDebug()<<val;
-
-    }
-    delete str;
-}
-
-void MainWindow::updateDataStore(const QByteArray &s)
-{
-    QString *str = new QString(s.toHex());
-
-    this->strDataStore.append(*str);
-    if(strDataStore.length()>10000)
-    {
-        strDataStore.remove(0, 1000);
-    }
 }

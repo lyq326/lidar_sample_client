@@ -3,6 +3,9 @@
         "*.h": "cpp",
         "*.i": "plaintext",
         "*.make": "makefile",
+        "*.qss": "css",
+        "*.ui": "xml",
+        "*.qs": "javascript",
         "qmainwindow": "cpp",
         "qapplication": "cpp",
         "qfile": "cpp",
@@ -71,6 +74,30 @@
         "qaction": "cpp",
         "qcursor": "cpp",
         "cinttypes": "cpp",
-        "qdebug": "cpp"
-    }
+        "qdebug": "cpp",
+        "qvector": "cpp",
+        "qtendian": "cpp",
+        "qudpsocket": "cpp",
+        "qhostaddress": "cpp",
+        "qtimer": "cpp",
+        "socket": "cpp",
+        "executor": "cpp",
+        "qregexpvalidator": "cpp",
+        "forward_list": "cpp",
+        "qbuttongroup": "cpp",
+        "codecvt": "cpp",
+        "cstring": "cpp",
+        "optional": "cpp",
+        "source_location": "cpp",
+        "iomanip": "cpp",
+        "ranges": "cpp",
+        "shared_mutex": "cpp",
+        "span": "cpp"
+    },
+    "cmake.configureSettings": {
+        // "-DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=TRUE",
+        "CMAKE_TOOLCHAIN_FILE": "D:\\bin\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic",
+        // "CMAKE_MAKE_PROGRAM": "D:\\bin\\ninja-win\\ninja.exe"
+    },
 }

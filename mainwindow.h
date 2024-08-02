@@ -3,14 +3,14 @@
 
 #include <QtWidgets>
 #include <QSerialPortInfo>
-#include "rawpanel/flowlayout.h"
-#include "serial/ReceiverThread.h"
-#include "data/DataFrame.h"
-#include "framepanel/ByteButton.h"
-#include "framepanel/FramePanel.h"
-#include "configpanel/ConfigPanel.h"
-// #include <qDebug>
-#include <QtMqtt>
+#include "maininfo\maininfoform.h"
+#include "datasub\datasubwidget.h"
+#include "../sample_lib/Database/database.h"
+
+#include <qDebug>
+// #include <QtMqtt>
+// #include "netclient\netclient.h"
+
 
 
 QT_BEGIN_NAMESPACE
@@ -23,22 +23,15 @@ class MainWindow : public QMainWindow
 
 public:
     MainWindow(QWidget *parent = nullptr);
+    bool importRecManual(QFile &f);
+    void writeDataPerChn(qint32 sample_chn, bool sample_mode, NetClient *nc, const QPair<NetClient::PayloadType, qint32> &p);
     ~MainWindow();
 
-    void updateDataPanel(const QByteArray &s);
-    void updateDataStore(const QByteArray &s);
+    Sample* m_sample;
+    Database* m_database;
 
 private:
     Ui::MainWindow *ui;
-    QVector<ByteButton*> btnDataPanel;
-    ReceiverThread *threadSerial;
-    QVector<QString> strDataStore;
-    DataFrame stucData;
-    FramePanel* dockFramePanel;
-    QDockWidget* dockRawPanel;
-    ConfigPanel* dockConfigPanel;
-
-    QMqttClient* m_client;
-    QTimer* m_mqttTimer;
+    // void writeDataPerChn(qint32 sample_chn, bool sample_mode, NetClient *nc, QPair<NetClient::PayloadType, qint32> &p);
 };
 #endif // MAINWINDOW_H
